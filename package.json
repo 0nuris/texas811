@@ -1,5 +1,5 @@
 {
-  "name": "@moveearth/texas811",
+  "name": "@0nuris/texas811",
   "version": "0.1.0",
   "description": "Texas 811 API client and server helpers",
   "type": "module",
