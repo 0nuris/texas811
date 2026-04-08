@@ -6,17 +6,17 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.mjs",
+      "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
     "./server": {
       "types": "./dist/server.d.ts",
-      "import": "./dist/server.mjs",
+      "import": "./dist/server.js",
       "require": "./dist/server.cjs"
     },
     "./nextjs": {
       "types": "./dist/nextjs.d.ts",
-      "import": "./dist/nextjs.mjs",
+      "import": "./dist/nextjs.js",
       "require": "./dist/nextjs.cjs"
     }
   },
@@ -35,6 +35,7 @@
     "registry": "https://npm.pkg.github.com"
   },
   "dependencies": {
+    "@0nuris/texas811": "github:0nuris/texas811#v0.1.0",
     "axios": ">=1.14.0",
     "axios-cookiejar-support": "^6.0.5",
     "tough-cookie": "^5.1.2",
