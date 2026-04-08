@@ -11,6 +11,8 @@ import type {
   Texas811UpdateResponse,
   Texas811NoResponseVendor,
   Texas811NoResponseResponse,
+  Texas811CreateTicketData,
+  Texas811CreateResponse,
 } from "./types";
 
 export interface Texas811ClientConfig {
@@ -147,6 +149,16 @@ export function createTexas811Client(config: Texas811ClientConfig) {
         "/texas811/tickets/no-response",
         { ticketId, vendors }
       );
+    },
+
+    createTicket(
+      ticketData: Texas811CreateTicketData,
+      temporaryTicketId?: string
+    ) {
+      return post<Texas811CreateResponse>("/texas811/tickets/create", {
+        ticketData,
+        temporaryTicketId,
+      });
     },
   };
 }

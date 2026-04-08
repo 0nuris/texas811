@@ -101,6 +101,12 @@ function createTexas811Client(config) {
         "/texas811/tickets/no-response",
         { ticketId, vendors }
       );
+    },
+    createTicket(ticketData, temporaryTicketId) {
+      return post("/texas811/tickets/create", {
+        ticketData,
+        temporaryTicketId
+      });
     }
   };
 }
