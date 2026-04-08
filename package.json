@@ -24,6 +24,7 @@
     "dist"
   ],
   "scripts": {
+    "prepare": "tsup",
     "build": "tsup",
     "test": "jest",
     "typecheck": "tsc --noEmit",
