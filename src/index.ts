@@ -1,4 +1,4 @@
-// @moveearth/texas811 — main entry point (browser-safe)
+// @0nuris/texas811 — main entry point (browser-safe)
 
 export { createTexas811Client } from "./client";
 export type { Texas811Client, Texas811ClientConfig } from "./client";
