@@ -35,7 +35,6 @@
     "registry": "https://npm.pkg.github.com"
   },
   "dependencies": {
-    "@0nuris/texas811": "github:0nuris/texas811#v0.1.0",
     "axios": ">=1.14.0",
     "axios-cookiejar-support": "^6.0.5",
     "tough-cookie": "^5.1.2",
