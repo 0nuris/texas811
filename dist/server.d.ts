@@ -24,6 +24,8 @@ interface Texas811Server {
     searchTickets(token: string, options?: Texas811SearchParams): Promise<Texas811SearchResponse>;
     getTicketByNumberHtml(token: string, ticketNumber: string): Promise<Texas811TicketHtmlData>;
     getTicketById(token: string, ticketId: string): Promise<Texas811TicketResponse>;
+    getWorkTypes(token: string): Promise<string[]>;
+    getEquipmentTypes(token: string): Promise<string[]>;
     updateTicket(token: string, ticketId: string, updates?: Texas811TicketUpdateParams): Promise<Texas811UpdateResponse>;
     submitNoResponse(token: string, ticketId: string, vendors: Texas811NoResponseVendor[]): Promise<Texas811NoResponseResponse>;
     createTicketWithSession(token: string, ticketData: Texas811CreateTicketData, temporaryTicketId?: string): Promise<Texas811CreateResponse>;

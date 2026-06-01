@@ -498,6 +498,44 @@ function createTexas811Server(config) {
     }
     return response.json();
   }
+  async function getWorkTypes(token) {
+    const url = `${baseUrl}/api/ticket/worktype/isPortal`;
+    const response = await fetchWithRetry(
+      url,
+      { method: "GET", headers: { Accept: "application/json" } },
+      token
+    );
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Get work types failed: ${response.status} ${response.statusText} - ${errorText.substring(0, 200)}`
+      );
+    }
+    const data = await response.json();
+    return Array.isArray(_optionalChain([data, 'optionalAccess', _18 => _18.workTypes])) ? data.workTypes : [];
+  }
+  async function getEquipmentTypes(token) {
+    const url = `${baseUrl}/api/client/ui/model/active?names=ticket-add-default,ticket-add-popup-default`;
+    const response = await fetchWithRetry(
+      url,
+      { method: "GET", headers: { Accept: "application/json" } },
+      token
+    );
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Get equipment types failed: ${response.status} ${response.statusText} - ${errorText.substring(0, 200)}`
+      );
+    }
+    const data = await response.json();
+    const model = (_nullishCoalesce(_optionalChain([data, 'optionalAccess', _19 => _19.models]), () => ( []))).find(
+      (m) => m.name === "ticket-add-default"
+    );
+    const item = (_nullishCoalesce(_optionalChain([model, 'optionalAccess', _20 => _20.items]), () => ( []))).find(
+      (it) => it.name === "MechanizedEquipment"
+    );
+    return Array.isArray(_optionalChain([item, 'optionalAccess', _21 => _21.selectionData])) ? item.selectionData : [];
+  }
   async function updateTicket(token, ticketId, updates = {}) {
     const url = `${baseUrl}/api/v3/app/ticket/${ticketId}/update?format=xml`;
     const xmlPayload = buildUpdateXml(updates);
@@ -583,6 +621,8 @@ function createTexas811Server(config) {
     searchTickets,
     getTicketByNumberHtml,
     getTicketById,
+    getWorkTypes,
+    getEquipmentTypes,
     updateTicket,
     submitNoResponse,
     createTicketWithSession

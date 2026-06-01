@@ -705,6 +705,46 @@ export function createTexas811Server(config: Texas811Config): Texas811Server {
     return response.json();
   }
 
+  async function getWorkTypes(token: string): Promise<string[]> {
+    const url = `${baseUrl}/api/ticket/worktype/isPortal`;
+    const response = await fetchWithRetry(
+      url,
+      { method: "GET", headers: { Accept: "application/json" } },
+      token
+    );
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Get work types failed: ${response.status} ${response.statusText} - ${errorText.substring(0, 200)}`
+      );
+    }
+    const data = await response.json();
+    return Array.isArray(data?.workTypes) ? data.workTypes : [];
+  }
+
+  async function getEquipmentTypes(token: string): Promise<string[]> {
+    const url = `${baseUrl}/api/client/ui/model/active?names=ticket-add-default,ticket-add-popup-default`;
+    const response = await fetchWithRetry(
+      url,
+      { method: "GET", headers: { Accept: "application/json" } },
+      token
+    );
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Get equipment types failed: ${response.status} ${response.statusText} - ${errorText.substring(0, 200)}`
+      );
+    }
+    const data = await response.json();
+    const model = (data?.models ?? []).find(
+      (m: { name?: string }) => m.name === "ticket-add-default"
+    );
+    const item = (model?.items ?? []).find(
+      (it: { name?: string }) => it.name === "MechanizedEquipment"
+    );
+    return Array.isArray(item?.selectionData) ? item.selectionData : [];
+  }
+
   async function updateTicket(
     token: string,
     ticketId: string,
@@ -813,6 +853,8 @@ export function createTexas811Server(config: Texas811Config): Texas811Server {
     searchTickets,
     getTicketByNumberHtml,
     getTicketById,
+    getWorkTypes,
+    getEquipmentTypes,
     updateTicket,
     submitNoResponse,
     createTicketWithSession,
@@ -837,6 +879,8 @@ export interface Texas811Server {
     token: string,
     ticketId: string
   ): Promise<Texas811TicketResponse>;
+  getWorkTypes(token: string): Promise<string[]>;
+  getEquipmentTypes(token: string): Promise<string[]>;
   updateTicket(
     token: string,
     ticketId: string,
