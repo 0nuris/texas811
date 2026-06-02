@@ -436,8 +436,9 @@ function createTexas811Server(config) {
       })
     );
     if (submitResp.status < 200 || submitResp.status >= 300) {
+      const detail = String(submitResp.data ?? "").trim().slice(0, 500);
       throw new Error(
-        `Ticket creation failed with status ${submitResp.status}`
+        `Ticket creation failed with status ${submitResp.status}${detail ? ` - ${detail}` : ""}`
       );
     }
     return parseCreateResponse(String(submitResp.data));
