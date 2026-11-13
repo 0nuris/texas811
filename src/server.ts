@@ -9,6 +9,8 @@ import type {
   Texas811SearchResponse,
   Texas811TicketHtmlData,
   Texas811TicketResponse,
+  Texas811TicketHistory,
+  Texas811TicketHistoryEntry,
   Texas811TicketUpdateParams,
   Texas811UpdateResponse,
   Texas811NoResponseVendor,
@@ -33,6 +35,63 @@ export const UPDATE_ONLY_FLAG = "$!UPD8T$ONLY!$";
 export const CANCEL_FLAG = "CAN$CAN$";
 export const NO_RESPONSE_PREFIX = "NR$";
 export const NO_RESPONSE_SUFFIX = "$NR";
+
+// === Ticket History Parsing ===
+
+/**
+ * Parse the `<tickets>` history bundle into the chain of tickets it contains.
+ * The endpoint returns XML (even with `format=json`); we extract each
+ * top-level `<ticket id="...">` and read its own number/oldNumber/creation.
+ *
+ * The ticket-level fields appear before the nested `<responses>` block (which
+ * has its own `creation`/`number`-like fields), so we read them from the head
+ * of each block to avoid picking up a vendor-response value.
+ */
+export function parseTicketHistory(
+  xml: string
+): Texas811TicketHistoryEntry[] {
+  const entries: Texas811TicketHistoryEntry[] = [];
+  const blockRe = /<ticket\b[^>]*\bid="(\d+)"[^>]*>([\s\S]*?)<\/ticket>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = blockRe.exec(xml)) !== null) {
+    const ticketId = match[1];
+    const head = match[2].split(/<responses\b/i)[0];
+    const numberMatch = head.match(/<number>([^<]*)<\/number>/i);
+    const oldNumberMatch = head.match(/<oldNumber>([^<]*)<\/oldNumber>/i);
+    const creationMatch = head.match(/<creation>([^<]*)<\/creation>/i);
+    entries.push({
+      ticketId,
+      ticketNumber: numberMatch?.[1] || null,
+      // `<oldNumber/>` (self-closing) means original ticket → null.
+      oldNumber: oldNumberMatch?.[1] || null,
+      creation: creationMatch?.[1] || null,
+    });
+  }
+  return entries;
+}
+
+/**
+ * Find the current ticket in a history chain — the tip that no other entry
+ * supersedes (its `ticketNumber` is not any other entry's `oldNumber`). This is
+ * order-independent; if the tip is ambiguous (it never should be for a linear
+ * chain) we fall back to the entry with the latest `creation`.
+ */
+export function findCurrentTicket(
+  chain: Texas811TicketHistoryEntry[]
+): Texas811TicketHistoryEntry | null {
+  if (chain.length === 0) return null;
+  const supersededNumbers = new Set(
+    chain.map((e) => e.oldNumber).filter((n): n is string => Boolean(n))
+  );
+  const tips = chain.filter(
+    (e) => e.ticketNumber && !supersededNumbers.has(e.ticketNumber)
+  );
+  const byCreation = (a: Texas811TicketHistoryEntry, b: Texas811TicketHistoryEntry) =>
+    String(a.creation ?? "").localeCompare(String(b.creation ?? ""));
+  if (tips.length === 1) return tips[0];
+  const pool = tips.length > 0 ? tips : chain.slice();
+  return pool.sort(byCreation)[pool.length - 1];
+}
 
 // === Configuration ===
 
@@ -705,6 +764,36 @@ export function createTexas811Server(config: Texas811Config): Texas811Server {
     return response.json();
   }
 
+  async function getTicketHistory(
+    token: string,
+    ticketId: string
+  ): Promise<Texas811TicketHistory> {
+    const url = `${baseUrl}/api/v3/app/ticket/${ticketId}/history?format=json`;
+
+    const response = await fetchWithRetry(
+      url,
+      { method: "GET", headers: { Accept: "application/json" } },
+      token
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Get ticket history failed: ${response.status} ${response.statusText} - ${errorText.substring(0, 200)}`
+      );
+    }
+
+    // The history endpoint returns XML even though we ask for json.
+    const xml = await response.text();
+    const chain = parseTicketHistory(xml);
+    return {
+      requestedTicketId: String(ticketId),
+      chain,
+      current: findCurrentTicket(chain),
+      rawResponse: xml,
+    };
+  }
+
   async function getWorkTypes(token: string): Promise<string[]> {
     const url = `${baseUrl}/api/ticket/worktype/isPortal`;
     const response = await fetchWithRetry(
@@ -853,6 +942,7 @@ export function createTexas811Server(config: Texas811Config): Texas811Server {
     searchTickets,
     getTicketByNumberHtml,
     getTicketById,
+    getTicketHistory,
     getWorkTypes,
     getEquipmentTypes,
     updateTicket,
@@ -879,6 +969,10 @@ export interface Texas811Server {
     token: string,
     ticketId: string
   ): Promise<Texas811TicketResponse>;
+  getTicketHistory(
+    token: string,
+    ticketId: string
+  ): Promise<Texas811TicketHistory>;
   getWorkTypes(token: string): Promise<string[]>;
   getEquipmentTypes(token: string): Promise<string[]>;
   updateTicket(

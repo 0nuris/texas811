@@ -6,6 +6,39 @@ var UPDATE_ONLY_FLAG = "$!UPD8T$ONLY!$";
 var CANCEL_FLAG = "CAN$CAN$";
 var NO_RESPONSE_PREFIX = "NR$";
 var NO_RESPONSE_SUFFIX = "$NR";
+function parseTicketHistory(xml) {
+  const entries = [];
+  const blockRe = /<ticket\b[^>]*\bid="(\d+)"[^>]*>([\s\S]*?)<\/ticket>/gi;
+  let match;
+  while ((match = blockRe.exec(xml)) !== null) {
+    const ticketId = match[1];
+    const head = match[2].split(/<responses\b/i)[0];
+    const numberMatch = head.match(/<number>([^<]*)<\/number>/i);
+    const oldNumberMatch = head.match(/<oldNumber>([^<]*)<\/oldNumber>/i);
+    const creationMatch = head.match(/<creation>([^<]*)<\/creation>/i);
+    entries.push({
+      ticketId,
+      ticketNumber: _optionalChain([numberMatch, 'optionalAccess', _ => _[1]]) || null,
+      // `<oldNumber/>` (self-closing) means original ticket → null.
+      oldNumber: _optionalChain([oldNumberMatch, 'optionalAccess', _2 => _2[1]]) || null,
+      creation: _optionalChain([creationMatch, 'optionalAccess', _3 => _3[1]]) || null
+    });
+  }
+  return entries;
+}
+function findCurrentTicket(chain) {
+  if (chain.length === 0) return null;
+  const supersededNumbers = new Set(
+    chain.map((e) => e.oldNumber).filter((n) => Boolean(n))
+  );
+  const tips = chain.filter(
+    (e) => e.ticketNumber && !supersededNumbers.has(e.ticketNumber)
+  );
+  const byCreation = (a, b) => String(_nullishCoalesce(a.creation, () => ( ""))).localeCompare(String(_nullishCoalesce(b.creation, () => ( ""))));
+  if (tips.length === 1) return tips[0];
+  const pool = tips.length > 0 ? tips : chain.slice();
+  return pool.sort(byCreation)[pool.length - 1];
+}
 var instanceCache = /* @__PURE__ */ new Map();
 function configKey(config) {
   return `${_nullishCoalesce(config.baseUrl, () => ( ""))}|${config.email}|${_nullishCoalesce(config.userAgent, () => ( ""))}`;
@@ -58,7 +91,7 @@ function createTexas811Server(config) {
       if (error.code === "ECONNABORTED") {
         return createTimeoutError(context);
       }
-      const status = _optionalChain([error, 'access', _ => _.response, 'optionalAccess', _2 => _2.status]);
+      const status = _optionalChain([error, 'access', _4 => _4.response, 'optionalAccess', _5 => _5.status]);
       if (status) {
         return new Error(
           `Texas 811 request failed during ${context} with status ${status}`
@@ -266,8 +299,8 @@ function createTexas811Server(config) {
     const oldTicketMatch = xml.match(/<oldTicketNumber>([^<]*)<\/oldTicketNumber>/i) || xml.match(/<OldTicketNumber>([^<]*)<\/OldTicketNumber>/i);
     const ticketNumberMatch = xml.match(/<ticketNumber>([^<]*)<\/ticketNumber>/i) || xml.match(/<TicketNumber>([^<]*)<\/TicketNumber>/i);
     return {
-      newTicketNumber: _optionalChain([newTicketMatch, 'optionalAccess', _3 => _3[1]]) || _optionalChain([ticketNumberMatch, 'optionalAccess', _4 => _4[1]]) || null,
-      oldTicketNumber: _optionalChain([oldTicketMatch, 'optionalAccess', _5 => _5[1]]) || null,
+      newTicketNumber: _optionalChain([newTicketMatch, 'optionalAccess', _6 => _6[1]]) || _optionalChain([ticketNumberMatch, 'optionalAccess', _7 => _7[1]]) || null,
+      oldTicketNumber: _optionalChain([oldTicketMatch, 'optionalAccess', _8 => _8[1]]) || null,
       isOutdatedTicket: false,
       rawResponse: xml
     };
@@ -276,8 +309,8 @@ function createTexas811Server(config) {
     const ticketIdMatch = xml.match(/<ticket\s+id="([^"]*)"/) || xml.match(/<ticket[^>]+id="([^"]*)"/i);
     const ticketNumberMatch = xml.match(/<number>([^<]*)<\/number>/i);
     return {
-      ticketId: _optionalChain([ticketIdMatch, 'optionalAccess', _6 => _6[1]]) || null,
-      ticketNumber: _optionalChain([ticketNumberMatch, 'optionalAccess', _7 => _7[1]]) || null,
+      ticketId: _optionalChain([ticketIdMatch, 'optionalAccess', _9 => _9[1]]) || null,
+      ticketNumber: _optionalChain([ticketNumberMatch, 'optionalAccess', _10 => _10[1]]) || null,
       rawResponse: xml
     };
   }
@@ -308,13 +341,13 @@ function createTexas811Server(config) {
     return result;
   }
   function parseBeginResponse(xml) {
-    const startedOn = _nullishCoalesce(_optionalChain([xml, 'access', _8 => _8.match, 'call', _9 => _9(/<startedOn>([^<]+)<\/startedOn>/i), 'optionalAccess', _10 => _10[1]]), () => ( ""));
-    const saversion = _nullishCoalesce(_optionalChain([xml, 'access', _11 => _11.match, 'call', _12 => _12(/<sa>([^<]+)<\/sa>/i), 'optionalAccess', _13 => _13[1]]), () => ( ""));
-    const baseversion = _nullishCoalesce(_optionalChain([xml, 'access', _14 => _14.match, 'call', _15 => _15(/<base>([^<]+)<\/base>/i), 'optionalAccess', _16 => _16[1]]), () => ( ""));
+    const startedOn = _nullishCoalesce(_optionalChain([xml, 'access', _11 => _11.match, 'call', _12 => _12(/<startedOn>([^<]+)<\/startedOn>/i), 'optionalAccess', _13 => _13[1]]), () => ( ""));
+    const saversion = _nullishCoalesce(_optionalChain([xml, 'access', _14 => _14.match, 'call', _15 => _15(/<sa>([^<]+)<\/sa>/i), 'optionalAccess', _16 => _16[1]]), () => ( ""));
+    const baseversion = _nullishCoalesce(_optionalChain([xml, 'access', _17 => _17.match, 'call', _18 => _18(/<base>([^<]+)<\/base>/i), 'optionalAccess', _19 => _19[1]]), () => ( ""));
     const workOnMatch = xml.match(
       /<calculatedDate>\s*<key>normal-WorkOn<\/key>\s*<value>([^<]+)<\/value>\s*<\/calculatedDate>/i
     );
-    const workOn = _nullishCoalesce(_optionalChain([workOnMatch, 'optionalAccess', _17 => _17[1]]), () => ( ""));
+    const workOn = _nullishCoalesce(_optionalChain([workOnMatch, 'optionalAccess', _20 => _20[1]]), () => ( ""));
     return { startedOn, saversion, baseversion, workOn };
   }
   async function fetchWithRetry(url, options, token) {
@@ -498,6 +531,28 @@ function createTexas811Server(config) {
     }
     return response.json();
   }
+  async function getTicketHistory(token, ticketId) {
+    const url = `${baseUrl}/api/v3/app/ticket/${ticketId}/history?format=json`;
+    const response = await fetchWithRetry(
+      url,
+      { method: "GET", headers: { Accept: "application/json" } },
+      token
+    );
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Get ticket history failed: ${response.status} ${response.statusText} - ${errorText.substring(0, 200)}`
+      );
+    }
+    const xml = await response.text();
+    const chain = parseTicketHistory(xml);
+    return {
+      requestedTicketId: String(ticketId),
+      chain,
+      current: findCurrentTicket(chain),
+      rawResponse: xml
+    };
+  }
   async function getWorkTypes(token) {
     const url = `${baseUrl}/api/ticket/worktype/isPortal`;
     const response = await fetchWithRetry(
@@ -512,7 +567,7 @@ function createTexas811Server(config) {
       );
     }
     const data = await response.json();
-    return Array.isArray(_optionalChain([data, 'optionalAccess', _18 => _18.workTypes])) ? data.workTypes : [];
+    return Array.isArray(_optionalChain([data, 'optionalAccess', _21 => _21.workTypes])) ? data.workTypes : [];
   }
   async function getEquipmentTypes(token) {
     const url = `${baseUrl}/api/client/ui/model/active?names=ticket-add-default,ticket-add-popup-default`;
@@ -528,13 +583,13 @@ function createTexas811Server(config) {
       );
     }
     const data = await response.json();
-    const model = (_nullishCoalesce(_optionalChain([data, 'optionalAccess', _19 => _19.models]), () => ( []))).find(
+    const model = (_nullishCoalesce(_optionalChain([data, 'optionalAccess', _22 => _22.models]), () => ( []))).find(
       (m) => m.name === "ticket-add-default"
     );
-    const item = (_nullishCoalesce(_optionalChain([model, 'optionalAccess', _20 => _20.items]), () => ( []))).find(
+    const item = (_nullishCoalesce(_optionalChain([model, 'optionalAccess', _23 => _23.items]), () => ( []))).find(
       (it) => it.name === "MechanizedEquipment"
     );
-    return Array.isArray(_optionalChain([item, 'optionalAccess', _21 => _21.selectionData])) ? item.selectionData : [];
+    return Array.isArray(_optionalChain([item, 'optionalAccess', _24 => _24.selectionData])) ? item.selectionData : [];
   }
   async function updateTicket(token, ticketId, updates = {}) {
     const url = `${baseUrl}/api/v3/app/ticket/${ticketId}/update?format=xml`;
@@ -621,6 +676,7 @@ function createTexas811Server(config) {
     searchTickets,
     getTicketByNumberHtml,
     getTicketById,
+    getTicketHistory,
     getWorkTypes,
     getEquipmentTypes,
     updateTicket,
@@ -637,4 +693,6 @@ function createTexas811Server(config) {
 
 
 
-exports.UPDATE_ONLY_FLAG = UPDATE_ONLY_FLAG; exports.CANCEL_FLAG = CANCEL_FLAG; exports.NO_RESPONSE_PREFIX = NO_RESPONSE_PREFIX; exports.NO_RESPONSE_SUFFIX = NO_RESPONSE_SUFFIX; exports.createTexas811Server = createTexas811Server;
+
+
+exports.UPDATE_ONLY_FLAG = UPDATE_ONLY_FLAG; exports.CANCEL_FLAG = CANCEL_FLAG; exports.NO_RESPONSE_PREFIX = NO_RESPONSE_PREFIX; exports.NO_RESPONSE_SUFFIX = NO_RESPONSE_SUFFIX; exports.parseTicketHistory = parseTicketHistory; exports.findCurrentTicket = findCurrentTicket; exports.createTexas811Server = createTexas811Server;

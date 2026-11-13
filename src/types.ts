@@ -73,6 +73,44 @@ export interface Texas811TicketResponse {
   [key: string]: unknown;
 }
 
+// === Ticket History (update chain) ===
+
+/**
+ * One ticket in a chain's history, as returned by the history endpoint. When a
+ * Texas 811 ticket is updated it becomes a NEW ticket (new id + number) that
+ * links back to the previous one via `oldNumber` — there is no forward pointer,
+ * which is why the history bundle is the only way to get from a stale ticket to
+ * the current one. We don't track these as versions; the chain is just how we
+ * find the current ticket to catch the DB up to.
+ */
+export interface Texas811TicketHistoryEntry {
+  /** Internal ticket id (the `<ticket id="...">` attribute). */
+  ticketId: string;
+  /** Public ticket number for this entry. */
+  ticketNumber: string | null;
+  /** Previous ticket's number, or null for the original ticket. */
+  oldNumber: string | null;
+  /** ISO creation timestamp. */
+  creation: string | null;
+}
+
+/**
+ * Full history chain for a ticket. The history endpoint returns the SAME bundle
+ * regardless of which member id is queried, so `chain` holds every ticket in
+ * the chain and `current` is the one to catch up to (the tip — the entry no
+ * other entry supersedes).
+ */
+export interface Texas811TicketHistory {
+  /** The ticket id that was queried. */
+  requestedTicketId: string;
+  /** Every ticket in the chain, in the order returned (oldest→newest). */
+  chain: Texas811TicketHistoryEntry[];
+  /** The current ticket to catch up to (null only if the chain came back empty). */
+  current: Texas811TicketHistoryEntry | null;
+  /** Raw XML response body, for debugging. */
+  rawResponse?: string;
+}
+
 export interface Texas811TicketEligibility {
   createdAt: string | null;
   eligibleAt: string | null;

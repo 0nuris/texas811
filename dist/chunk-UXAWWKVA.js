@@ -6,6 +6,39 @@ var UPDATE_ONLY_FLAG = "$!UPD8T$ONLY!$";
 var CANCEL_FLAG = "CAN$CAN$";
 var NO_RESPONSE_PREFIX = "NR$";
 var NO_RESPONSE_SUFFIX = "$NR";
+function parseTicketHistory(xml) {
+  const entries = [];
+  const blockRe = /<ticket\b[^>]*\bid="(\d+)"[^>]*>([\s\S]*?)<\/ticket>/gi;
+  let match;
+  while ((match = blockRe.exec(xml)) !== null) {
+    const ticketId = match[1];
+    const head = match[2].split(/<responses\b/i)[0];
+    const numberMatch = head.match(/<number>([^<]*)<\/number>/i);
+    const oldNumberMatch = head.match(/<oldNumber>([^<]*)<\/oldNumber>/i);
+    const creationMatch = head.match(/<creation>([^<]*)<\/creation>/i);
+    entries.push({
+      ticketId,
+      ticketNumber: numberMatch?.[1] || null,
+      // `<oldNumber/>` (self-closing) means original ticket → null.
+      oldNumber: oldNumberMatch?.[1] || null,
+      creation: creationMatch?.[1] || null
+    });
+  }
+  return entries;
+}
+function findCurrentTicket(chain) {
+  if (chain.length === 0) return null;
+  const supersededNumbers = new Set(
+    chain.map((e) => e.oldNumber).filter((n) => Boolean(n))
+  );
+  const tips = chain.filter(
+    (e) => e.ticketNumber && !supersededNumbers.has(e.ticketNumber)
+  );
+  const byCreation = (a, b) => String(a.creation ?? "").localeCompare(String(b.creation ?? ""));
+  if (tips.length === 1) return tips[0];
+  const pool = tips.length > 0 ? tips : chain.slice();
+  return pool.sort(byCreation)[pool.length - 1];
+}
 var instanceCache = /* @__PURE__ */ new Map();
 function configKey(config) {
   return `${config.baseUrl ?? ""}|${config.email}|${config.userAgent ?? ""}`;
@@ -498,6 +531,28 @@ function createTexas811Server(config) {
     }
     return response.json();
   }
+  async function getTicketHistory(token, ticketId) {
+    const url = `${baseUrl}/api/v3/app/ticket/${ticketId}/history?format=json`;
+    const response = await fetchWithRetry(
+      url,
+      { method: "GET", headers: { Accept: "application/json" } },
+      token
+    );
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Get ticket history failed: ${response.status} ${response.statusText} - ${errorText.substring(0, 200)}`
+      );
+    }
+    const xml = await response.text();
+    const chain = parseTicketHistory(xml);
+    return {
+      requestedTicketId: String(ticketId),
+      chain,
+      current: findCurrentTicket(chain),
+      rawResponse: xml
+    };
+  }
   async function getWorkTypes(token) {
     const url = `${baseUrl}/api/ticket/worktype/isPortal`;
     const response = await fetchWithRetry(
@@ -621,6 +676,7 @@ function createTexas811Server(config) {
     searchTickets,
     getTicketByNumberHtml,
     getTicketById,
+    getTicketHistory,
     getWorkTypes,
     getEquipmentTypes,
     updateTicket,
@@ -636,5 +692,7 @@ export {
   CANCEL_FLAG,
   NO_RESPONSE_PREFIX,
   NO_RESPONSE_SUFFIX,
+  parseTicketHistory,
+  findCurrentTicket,
   createTexas811Server
 };

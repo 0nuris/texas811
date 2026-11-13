@@ -54,6 +54,40 @@ interface Texas811TicketResponse {
     responses?: Texas811VendorResponse[];
     [key: string]: unknown;
 }
+/**
+ * One ticket in a chain's history, as returned by the history endpoint. When a
+ * Texas 811 ticket is updated it becomes a NEW ticket (new id + number) that
+ * links back to the previous one via `oldNumber` — there is no forward pointer,
+ * which is why the history bundle is the only way to get from a stale ticket to
+ * the current one. We don't track these as versions; the chain is just how we
+ * find the current ticket to catch the DB up to.
+ */
+interface Texas811TicketHistoryEntry {
+    /** Internal ticket id (the `<ticket id="...">` attribute). */
+    ticketId: string;
+    /** Public ticket number for this entry. */
+    ticketNumber: string | null;
+    /** Previous ticket's number, or null for the original ticket. */
+    oldNumber: string | null;
+    /** ISO creation timestamp. */
+    creation: string | null;
+}
+/**
+ * Full history chain for a ticket. The history endpoint returns the SAME bundle
+ * regardless of which member id is queried, so `chain` holds every ticket in
+ * the chain and `current` is the one to catch up to (the tip — the entry no
+ * other entry supersedes).
+ */
+interface Texas811TicketHistory {
+    /** The ticket id that was queried. */
+    requestedTicketId: string;
+    /** Every ticket in the chain, in the order returned (oldest→newest). */
+    chain: Texas811TicketHistoryEntry[];
+    /** The current ticket to catch up to (null only if the chain came back empty). */
+    current: Texas811TicketHistoryEntry | null;
+    /** Raw XML response body, for debugging. */
+    rawResponse?: string;
+}
 interface Texas811TicketEligibility {
     createdAt: string | null;
     eligibleAt: string | null;
@@ -211,4 +245,4 @@ declare function isVendorUnresponsive(response: Texas811VendorResponse): boolean
  */
 declare function getUnresponsiveVendors(ticketData: Texas811TicketResponse, hours?: number): Texas811UnresponsiveVendor[];
 
-export { type ApiResponse as A, type Texas811SearchParams as T, type Texas811SearchResponse as a, type Texas811TicketHtmlData as b, type Texas811TicketResponse as c, type Texas811TicketUpdateParams as d, type Texas811UpdateResponse as e, type Texas811NoResponseVendor as f, type Texas811NoResponseResponse as g, type Texas811CreateTicketData as h, type Texas811CreateResponse as i, type ApiError as j, TEXAS811_ACTION_LOCK_HOURS as k, type Texas811AuthResponse as l, type Texas811EligibilityErrorDetails as m, type Texas811Excavator as n, type Texas811ItemAttribute as o, type Texas811ItemAttributeValue as p, type Texas811SearchResult as q, type Texas811TicketEligibility as r, type Texas811UnresponsiveVendor as s, type Texas811VendorResponse as t, type Texas811WorkSite as u, getTexas811TicketEligibility as v, getUnresponsiveVendors as w, hasVendorResponded as x, isVendorUnresponsive as y };
+export { type ApiResponse as A, type Texas811TicketHistoryEntry as B, type Texas811SearchParams as T, type Texas811SearchResponse as a, type Texas811TicketHtmlData as b, type Texas811TicketResponse as c, type Texas811TicketUpdateParams as d, type Texas811UpdateResponse as e, type Texas811NoResponseVendor as f, type Texas811NoResponseResponse as g, type Texas811CreateTicketData as h, type Texas811CreateResponse as i, type ApiError as j, TEXAS811_ACTION_LOCK_HOURS as k, type Texas811AuthResponse as l, type Texas811EligibilityErrorDetails as m, type Texas811Excavator as n, type Texas811ItemAttribute as o, type Texas811ItemAttributeValue as p, type Texas811SearchResult as q, type Texas811TicketEligibility as r, type Texas811UnresponsiveVendor as s, type Texas811VendorResponse as t, type Texas811WorkSite as u, getTexas811TicketEligibility as v, getUnresponsiveVendors as w, hasVendorResponded as x, isVendorUnresponsive as y, type Texas811TicketHistory as z };
